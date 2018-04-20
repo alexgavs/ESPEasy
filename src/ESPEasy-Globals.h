@@ -529,6 +529,8 @@ enum Command {
   cmd_TaskRun,
   cmd_TaskValueSet,
   cmd_TimerSet,
+  cmd_TimerPause,
+  cmd_TimerResume,
   cmd_udptest,
   cmd_Unit,
   cmd_wdconfig,
@@ -905,10 +907,14 @@ struct EventStruct
 };
 
 #define LOG_STRUCT_MESSAGE_SIZE 128
-#if defined(PLUGIN_BUILD_TESTING) || defined(PLUGIN_BUILD_DEV)
-  #define LOG_STRUCT_MESSAGE_LINES 10
+#ifdef ESP32
+  #define LOG_STRUCT_MESSAGE_LINES 30
 #else
-  #define LOG_STRUCT_MESSAGE_LINES 15
+  #if defined(PLUGIN_BUILD_TESTING) || defined(PLUGIN_BUILD_DEV)
+    #define LOG_STRUCT_MESSAGE_LINES 10
+  #else
+    #define LOG_STRUCT_MESSAGE_LINES 15
+  #endif
 #endif
 
 struct LogStruct {
@@ -1099,7 +1105,12 @@ String printWebString = "";
 boolean printToWebJSON = false;
 
 float UserVar[VARS_PER_TASK * TASKS_MAX];
-unsigned long RulesTimer[RULES_TIMER_MAX];
+struct rulesTiemerStatus
+{
+  unsigned long timestamp;
+  unsigned int interval; //interval in millisencond
+  boolean paused; 
+} RulesTimer[RULES_TIMER_MAX];
 
 unsigned long timerSensor[TASKS_MAX];
 unsigned long timer100ms;
@@ -1224,6 +1235,9 @@ bool processedGetIP = true;
 bool processedConnectAPmode = true;
 bool processedDisconnectAPmode = true;
 bool processedScanDone = true;
+
+bool webserver_state = false;
+bool webserver_init = false;
 
 unsigned long start = 0;
 unsigned long elapsed = 0;

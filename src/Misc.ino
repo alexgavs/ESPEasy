@@ -2021,7 +2021,8 @@ String rulesProcessingFile(String fileName, String& event)
   boolean conditional = false;
   boolean condition = false;
   boolean ifBranche = false;
-
+  boolean ifBrancheJustMatch = false;
+    
   byte buf[RULES_BUFFER_SIZE];
   int len = 0;
   while (f.available())
@@ -2114,25 +2115,57 @@ String rulesProcessingFile(String fileName, String& event)
           if (match) // rule matched for one action or a block of actions
           {
             int split = lcAction.indexOf("if "); // check for optional "if" condition
-            if (split != -1)
+            boolean elseif = lcAction.startsWith("elseif ");
+            if (elseif == false && split != -1)
             {
               conditional = true;
               String check = lcAction.substring(split + 3);
-              condition = conditionMatchExtended(check);
+              log = F("[if ");
+              log += check;
+              log += "]=";              
+              condition = ifBrancheJustMatch == false && conditionMatchExtended(check);
+              if(condition == true)
+              {
+                 ifBrancheJustMatch = true;
+              }
               ifBranche = true;
               isCommand = false;
+              log += condition ? F("true") : F("false");
+              addLog(LOG_LEVEL_DEBUG, log);
             }
-
+            
+            if(elseif)
+            {
+              String check = lcAction.substring(7);
+              log = F("[elseif ");
+              log += check;
+              log += "]=";			  
+              condition = ifBrancheJustMatch == false && conditionMatchExtended(check);
+              if(condition == true)
+              {
+                 ifBrancheJustMatch = true;
+              }
+              ifBranche = true;
+              isCommand = false;  
+              log += condition ? F("true") : F("false");
+              addLog(LOG_LEVEL_DEBUG, log);			  
+            }
+            
             if (lcAction == "else") // in case of an "else" block of actions, set ifBranche to false
             {
               ifBranche = false;
               isCommand = false;
+              log = F("else = ");
+              log += (conditional && (condition == ifBranche)) ? F("true") : F("false");
+              addLog(LOG_LEVEL_DEBUG, log);	
             }
 
             if (lcAction == "endif") // conditional block ends here
             {
               conditional = false;
               isCommand = false;
+              ifBranche = false;
+              ifBrancheJustMatch = false;
             }
 
             // process the action if it's a command and unconditional, or conditional and the condition matches the if or else block.
@@ -2174,7 +2207,7 @@ String rulesProcessingFile(String fileName, String& event)
             }
           }
         }
-
+        
         line = "";
       }
     }
@@ -2182,7 +2215,7 @@ String rulesProcessingFile(String fileName, String& event)
 
   nestingLevel--;
   checkRAM(F("rulesProcessingFile2"));
-  return (String());
+  return (F(""));
 }
 
 
@@ -2449,11 +2482,11 @@ void rulesTimers()
 {
   for (byte x = 0; x < RULES_TIMER_MAX; x++)
   {
-    if (RulesTimer[x] != 0L) // timer active?
+    if (!RulesTimer[x].paused && RulesTimer[x].timestamp != 0L) // timer active?
     {
-      if (timeOutReached(RulesTimer[x])) // timer finished?
+      if (timeOutReached(RulesTimer[x].timestamp)) // timer finished?
       {
-        RulesTimer[x] = 0L; // turn off this timer
+        RulesTimer[x].timestamp = 0L; // turn off this timer
         String event = F("Rules#Timer=");
         event += x + 1;
         rulesProcessing(event);
